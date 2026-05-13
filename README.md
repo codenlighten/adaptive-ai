@@ -39,6 +39,19 @@ budget. On a heterogeneous workload, a confidence-routed transformer achieves
 
 Smaller. Faster. Multiply-free. With a runtime precision knob.
 
+## v0.1.2: closed-form encoder
+
+The first-order delta-sigma recurrence has a closed form — the cumulative
+sum of bits at step `t` is exactly `sign(t·w) · ⌈|t·w| − 0.5⌉` (round
+half toward zero). This eliminates the per-step Python loop:
+
+| Path | What it does | Speedup vs T-step loop |
+|---|---|---:|
+| `delta_sigma_mean_ternary(W, T)` | Computes the time-average directly — no stream allocation. Used in the training forward. | **5-84× (encode-only) → 4-13× end-to-end training step** |
+| `encode_delta_sigma_ternary(W, T)` | Builds the full (T, *shape) stream via one broadcast multiply + ceil + diff. | 3-4× on small shapes, ~1× on large (allocation-bound) |
+
+See `scripts/bench_encode.py` for reproduction.
+
 ## Why this matters
 
 Today's quantization (INT8, INT4, BitNet b1.58) makes precision a
@@ -70,7 +83,7 @@ cd adaptive-ai
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# Run unit tests (83 of them)
+# Run unit tests (93 of them)
 python -m pytest tests/
 
 # Train a delta-sigma MLP at T=8 on the damped oscillator

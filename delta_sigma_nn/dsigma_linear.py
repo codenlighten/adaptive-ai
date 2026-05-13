@@ -35,7 +35,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .delta_sigma import encode_delta_sigma_order2, encode_delta_sigma_ternary
+from .delta_sigma import (
+    delta_sigma_mean_ternary,
+    encode_delta_sigma_order2,
+    encode_delta_sigma_ternary,
+)
 
 
 class _STEEncode(torch.autograd.Function):
@@ -52,10 +56,11 @@ class _STEEncode(torch.autograd.Function):
         alpha = W.abs().mean().clamp_min(1e-5)
         W_norm = (W / alpha).clamp(-1.0, 1.0)
         if order == 1:
-            stream = encode_delta_sigma_ternary(W_norm, T=T)
+            # Fast path: compute the time-average directly without
+            # materializing the (T, *W.shape) stream.
+            avg = delta_sigma_mean_ternary(W_norm, T=T)
         else:
-            stream = encode_delta_sigma_order2(W_norm, T=T)
-        avg = stream.mean(dim=0)
+            avg = encode_delta_sigma_order2(W_norm, T=T).mean(dim=0)
         return avg * alpha
 
     @staticmethod

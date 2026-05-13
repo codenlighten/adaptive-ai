@@ -27,6 +27,29 @@ with classical sigma-delta modulators.
 A weight tensor is encoded element-wise. The matmul below is computed
 as the time-average of T one-trit matmuls — each of which uses zero
 multiplications.
+
+Closed-form encoding
+--------------------
+For the default theta=0.5 with no dither, the cumulative sum of bits
+emitted up to step t has the closed form
+
+    S_t = sign(t * w) * ceil(|t * w| - 0.5)        (1)
+
+(this is "round half toward zero" of t*w). Bits then follow as
+bit_t = S_t - S_{t-1}, so the entire (T, *shape) stream can be built
+in a single broadcast multiply + ceil + diff — no Python loop, no
+per-step tensor allocation. The training forward only needs the
+time-average (= S_T / T), which skips stream materialization entirely.
+
+The closed form is *algebraically* equivalent to the loop. At fp32 it
+can differ from the loop by ±1 step in the bit positions because the
+loop "resets" after each fire (avoiding drift accumulation) while the
+closed form does not — but the time-average is identical, so training
+and full-T inference produce the same outputs. Anytime inference at
+k<T may see sub-1/k differences in intermediate outputs.
+
+The loop implementation is kept available as a fallback for dither and
+non-default theta.
 """
 
 from __future__ import annotations
@@ -41,11 +64,49 @@ def encode_delta_sigma_ternary(W: torch.Tensor, T: int, theta: float = 0.5,
     Each element of the output is in {-1, 0, +1} and the time-average
     over dim=0 approximates the original W.
 
-    For training stability we add a small random-noise dither so the
-    integrator doesn't get stuck in degenerate cycles when w_target == 0.
+    For the default theta=0.5 with no dither this uses a vectorized
+    closed form (see module docstring). With dither or non-default theta
+    it falls back to the sequential loop, which also supports a small
+    random-noise dither so the integrator doesn't get stuck in
+    degenerate cycles when w_target == 0.
     """
-    # Map W to [-1, 1] approximately — use a soft clamp via tanh-like rescale
-    # but in practice we just clamp; train-time STE keeps gradients flowing.
+    if noise_dither == 0.0 and theta == 0.5:
+        return _encode_ternary_vec(W, T)
+    return _encode_ternary_loop(W, T, theta=theta, noise_dither=noise_dither)
+
+
+def _encode_ternary_vec(W: torch.Tensor, T: int) -> torch.Tensor:
+    """Vectorized closed form for theta=0.5, no dither.
+
+    Builds the (T, *W.shape) stream via a single broadcast + ceil + diff.
+    """
+    Wc = W.clamp(-1.0, 1.0)
+    t = torch.arange(1, T + 1, dtype=W.dtype, device=W.device)
+    t = t.view([T] + [1] * Wc.ndim)                          # (T, 1, 1, ...)
+    x = t * Wc                                               # (T, *shape)
+    S = torch.sign(x) * torch.ceil(x.abs() - 0.5)            # round-half-to-zero
+    S_prev = torch.empty_like(S)
+    S_prev[0].zero_()
+    S_prev[1:] = S[:-1]
+    return S - S_prev
+
+
+def delta_sigma_mean_ternary(W: torch.Tensor, T: int) -> torch.Tensor:
+    """Time-average of the ternary delta-sigma stream — no stream allocation.
+
+    Equivalent to `encode_delta_sigma_ternary(W, T).mean(dim=0)` for the
+    default theta=0.5, no-dither case, but does not materialize the
+    (T, *shape) intermediate. Used in the training forward path.
+    """
+    Wc = W.clamp(-1.0, 1.0)
+    x = T * Wc                                               # (*shape,)
+    S_T = torch.sign(x) * torch.ceil(x.abs() - 0.5)
+    return S_T / T
+
+
+def _encode_ternary_loop(W: torch.Tensor, T: int, theta: float = 0.5,
+                          noise_dither: float = 0.0) -> torch.Tensor:
+    """Reference sequential implementation. Supports dither and any theta."""
     Wc = W.clamp(-1.0, 1.0)
     stream = torch.empty((T,) + W.shape, dtype=W.dtype, device=W.device)
     integrator = torch.zeros_like(Wc)
