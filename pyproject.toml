@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delta-sigma-nn"
+version = "0.1.0"
+description = "Multiply-free neural networks with delta-sigma weights and anytime inference"
+readme = "DELTA_SIGMA_WEIGHTS.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "physics-ai"}]
+keywords = ["quantization", "neural-networks", "ternary", "bitnet", "delta-sigma", "anytime-inference"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0",
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+fast = ["numba>=0.59"]
+plot = ["matplotlib>=3.6"]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Documentation = "https://github.com/example/delta-sigma-nn/blob/main/DELTA_SIGMA_WEIGHTS.md"
+Source = "https://github.com/example/delta-sigma-nn"
+
+[tool.setuptools]
+packages = ["delta_sigma_nn"]
+
+[tool.setuptools.package-data]
+delta_sigma_nn = ["examples/*.py"]

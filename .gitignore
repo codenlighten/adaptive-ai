@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Build artifacts
+build/
+dist/
+*.egg
+
+# Editor + OS
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Regeneratable model checkpoints (rebuild with scripts)
+*.npz
+*.pt
+*.pth
+
+# Regeneratable synthesis netlists (rerun yosys to recreate)
+hardware/*.json
+hardware/*.asc
+
+# Local logs and caches
+*.log
+.cache/

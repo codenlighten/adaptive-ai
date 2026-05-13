@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Binary",
+    "mse": 0.00016362588212359697,
+    "H_bits": 0.9997178870677779,
+    "naive_bits": 1.0,
+    "n_quantized": 49152,
+    "scheme": "binary"
+  },
+  {
+    "label": "Ternary",
+    "mse": 9.491853415966034e-05,
+    "H_bits": 1.5495123760348901,
+    "naive_bits": 1.584962500721156,
+    "n_quantized": 49152,
+    "scheme": "ternary"
+  },
+  {
+    "label": "Quaternary",
+    "mse": 7.370871753664687e-05,
+    "H_bits": 1.9914640075209173,
+    "naive_bits": 2.0,
+    "n_quantized": 49152,
+    "scheme": "quaternary"
+  },
+  {
+    "label": "Quintary",
+    "mse": 4.5396423956844956e-05,
+    "H_bits": 2.206295804127208,
+    "naive_bits": 2.321928094887362,
+    "n_quantized": 49152,
+    "scheme": "quintary"
+  },
+  {
+    "label": "fp32",
+    "mse": 2.0875606423942372e-05,
+    "H_bits": 32.0,
+    "naive_bits": 32.0,
+    "n_quantized": 0,
+    "scheme": "fp32"
+  }
+]

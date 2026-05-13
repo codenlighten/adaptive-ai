@@ -1,0 +1,22 @@
+# Read the ternary hardware
+read_verilog hardware/ternary_full_adder.v
+
+# Each module gets its own report after synthesis.
+hierarchy -check -top ternary_full_adder
+proc; opt; fsm; opt; memory; opt
+techmap; opt
+stat
+
+design -reset
+read_verilog hardware/ternary_full_adder.v
+hierarchy -check -top trit18_adder
+proc; opt; fsm; opt; memory; opt
+techmap; opt
+stat
+
+design -reset
+read_verilog hardware/ternary_full_adder.v
+hierarchy -check -top ternary_pe
+proc; opt; fsm; opt; memory; opt
+techmap; opt
+stat

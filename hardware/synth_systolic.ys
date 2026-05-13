@@ -1,0 +1,6 @@
+# Synthesize the 1-D systolic ternary matmul array for iCE40.
+# Default N=8; override via -D N=16 etc on the command line.
+
+read_verilog hardware/systolic_array.v
+synth_ice40 -top ternary_systolic_array -json hardware/systolic_array.json
+stat

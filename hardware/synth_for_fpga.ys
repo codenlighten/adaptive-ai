@@ -1,0 +1,6 @@
+# Synthesize ternary_pe targeting the iCE40 architecture (LUT4 + DFFs)
+# and emit a JSON netlist that nextpnr can place-and-route.
+
+read_verilog hardware/ternary_full_adder.v
+synth_ice40 -top ternary_pe -json hardware/ternary_pe.json
+stat

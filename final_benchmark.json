@@ -1,0 +1,57 @@
+{
+  "tasks": {
+    "oscillator": {
+      "BitMLP": 0.0001026878526317887,
+      "FPMLP": 2.160571784770582e-05,
+      "DSigma T=8": 7.252024079207331e-05,
+      "DSigma T=16": 7.835937867639586e-05
+    },
+    "schrodinger": {
+      "BitMLP": 0.0025634397752583027,
+      "FPMLP": 0.00037334856460802257,
+      "DSigma T=8": 0.0016340225702151656,
+      "DSigma T=16": 0.0025309952907264233
+    },
+    "digits": {
+      "BitMLP": {
+        "loss": 0.1326875239610672,
+        "acc": 0.9833333492279053
+      },
+      "FPMLP": {
+        "loss": 0.15733639895915985,
+        "acc": 0.9833333492279053
+      },
+      "DSigma T=8": {
+        "loss": 0.1556558758020401,
+        "acc": 0.980555534362793
+      },
+      "DSigma T=16": {
+        "loss": 0.14500652253627777,
+        "acc": 0.9833333492279053
+      }
+    }
+  },
+  "hardware": {
+    "ternary_pe": {
+      "LCs": 283,
+      "max_MHz": 16.83,
+      "device": "iCE40 HX1K"
+    },
+    "dsigma_pe": {
+      "LCs": 206,
+      "max_MHz": 75.08,
+      "device": "iCE40 HX1K"
+    },
+    "dsigma_systolic_N8": {
+      "LCs": 1862,
+      "device": "iCE40 HX8K",
+      "LCs_per_PE": 232
+    }
+  },
+  "storage": {
+    "n_params": 50945,
+    "fp32_state_bytes": 203780,
+    "ds_packed_bytes": 92633,
+    "compression": 2.1998639793594075
+  }
+}
