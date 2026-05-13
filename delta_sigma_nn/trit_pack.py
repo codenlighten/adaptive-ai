@@ -40,12 +40,10 @@ def unpack_trits(packed: np.ndarray, length: int) -> np.ndarray:
     """Inverse of pack_trits. Returns an int8 array of `length` trits."""
     if length == 0:
         return np.zeros(0, dtype=np.int8)
-    vals = packed.astype(np.uint16)
-    out = np.zeros((vals.size, 5), dtype=np.int8)
-    for i in range(5):
-        out[:, i] = (vals % 3).astype(np.int8) - 1
-        vals //= 3
-    return out.ravel()[:length]
+    vals = packed.astype(np.uint16)[:, None]                     # (N, 1)
+    digits = (vals // _POW3[None, :]) % 3                        # (N, 5) in {0,1,2}
+    out = (digits.astype(np.int8) - 1).reshape(-1)               # back to {-1,0,1}
+    return out[:length]
 
 
 def storage_bytes(n_trits: int) -> int:

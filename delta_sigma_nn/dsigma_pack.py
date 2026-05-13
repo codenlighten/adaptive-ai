@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from scipy.special import erf as _erf
 
 from .delta_sigma import encode_delta_sigma_order2, encode_delta_sigma_ternary
 from .dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
@@ -81,18 +82,12 @@ def save_dsigma_mlp(model: DeltaSigmaMLP, path: str | Path) -> dict[str, int]:
     path = Path(path)
     blobs: dict[str, np.ndarray] = {}
 
-    linears = []
-    dsigmas = []
-    for m in model.net:
-        if isinstance(m, DeltaSigmaLinear):
-            dsigmas.append(m)
-        elif isinstance(m, torch.nn.Linear):
-            linears.append(m)
+    dsigmas = list(model.dsigma_blocks)
 
-    blobs["boundary_in_W"]  = linears[0].weight.detach().numpy().astype(np.float32)
-    blobs["boundary_in_b"]  = linears[0].bias.detach().numpy().astype(np.float32)
-    blobs["boundary_out_W"] = linears[1].weight.detach().numpy().astype(np.float32)
-    blobs["boundary_out_b"] = linears[1].bias.detach().numpy().astype(np.float32)
+    blobs["boundary_in_W"]  = model.in_proj.weight.detach().numpy().astype(np.float32)
+    blobs["boundary_in_b"]  = model.in_proj.bias.detach().numpy().astype(np.float32)
+    blobs["boundary_out_W"] = model.out_proj.weight.detach().numpy().astype(np.float32)
+    blobs["boundary_out_b"] = model.out_proj.bias.detach().numpy().astype(np.float32)
     blobs["layer_count"] = np.array(len(dsigmas), dtype=np.int64)
 
     breakdown = {
@@ -143,16 +138,21 @@ def dsigma_inference(arrays: dict, x: np.ndarray, k: int | None = None) -> np.nd
 
     If k is None, use full T. Otherwise truncate to first k time steps
     (anytime inference).
-    """
-    from scipy.special import erf
 
+    This is a *correctness oracle* for the multiply-free claim, not a
+    multiply-free implementation: we fold the T trit slices into a single
+    fp32 effective matrix and call `@`, which does use floating-point
+    multiplications. The multiply-free path is the Verilog backend in
+    `hardware/` (or any T-step accumulate-and-shift implementation). For
+    PyTorch/NumPy this fused form is faster and bit-identical at full T.
+    """
     def layernorm(x, w, b, eps=1e-5):
         mu = x.mean(axis=-1, keepdims=True)
         var = ((x - mu) ** 2).mean(axis=-1, keepdims=True)
         return ((x - mu) / np.sqrt(var + eps)) * w + b
 
     def gelu(x):
-        return 0.5 * x * (1.0 + erf(x / np.sqrt(2.0)))
+        return 0.5 * x * (1.0 + _erf(x / np.sqrt(2.0)))
 
     def fp_linear(x, W, b):
         return x @ W.T + b

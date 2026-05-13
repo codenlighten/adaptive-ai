@@ -26,7 +26,7 @@ from .delta_sigma import (
     encode_delta_sigma_order2,
     encode_delta_sigma_ternary,
 )
-from .dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
+from .dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP, dsigma_inference_context
 from .dsigma_pack import (
     dsigma_inference,
     load_dsigma_arrays,
@@ -38,7 +38,7 @@ from .dsigma_router import confidence_router
 from .dsigma_transformer import DSigmaCharLM
 from .trit_pack import pack_trits, unpack_trits, storage_bytes
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "DeltaSigmaLinear",
@@ -53,6 +53,7 @@ __all__ = [
     "pack_dsigma_layer",
     "unpack_dsigma_layer",
     "confidence_router",
+    "dsigma_inference_context",
     "pack_trits",
     "unpack_trits",
     "storage_bytes",
