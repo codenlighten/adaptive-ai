@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "delta-sigma-nn"
-version = "0.1.2"
+version = "0.1.3"
 description = "Multiply-free neural networks with delta-sigma weights and anytime inference"
 readme = "DELTA_SIGMA_WEIGHTS.md"
 requires-python = ">=3.10"

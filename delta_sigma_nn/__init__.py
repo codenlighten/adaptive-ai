@@ -38,7 +38,7 @@ from .dsigma_router import confidence_router
 from .dsigma_transformer import DSigmaCharLM
 from .trit_pack import pack_trits, unpack_trits, storage_bytes
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 __all__ = [
     "DeltaSigmaLinear",

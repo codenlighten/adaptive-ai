@@ -39,6 +39,35 @@ budget. On a heterogeneous workload, a confidence-routed transformer achieves
 
 Smaller. Faster. Multiply-free. With a runtime precision knob.
 
+## Reproducible benchmarks (v0.1.3)
+
+A deterministic multi-seed benchmark suite ships in `scripts/benchmark_suite.py`
+and `scripts/render_leaderboard.py`. Three tasks (oscillator, Schrödinger,
+digits) × five models (fp32, INT8 dynamic, BitNet b1.58, DSigma T=8, DSigma T=16)
+× three seeds, plus an anytime sweep at k = 1, 2, 4, 8, 16 for each DSigma config.
+CSV in `benchmarks/results.csv`, figures below.
+
+![Leaderboard](benchmarks/leaderboard.png)
+
+![Anytime inference curves](benchmarks/anytime.png)
+
+Reproduce with:
+
+```bash
+python -m scripts.benchmark_suite                  # ~5 min on CPU
+python -m scripts.render_leaderboard
+```
+
+Notes:
+- DSigma matches BitNet on classification and **beats it** on both regression
+  tasks at T=8 and T=16, with smaller cross-seed variance.
+- INT8 dynamic quantization performs poorly here because it calibrates on a
+  single forward pass; for these small unbounded-output regression MLPs the
+  activation ranges are poorly estimated. This is the realistic INT8 story
+  for ad-hoc post-training quantization on small models.
+- The anytime curves show that at k=8 the truncated DSigma matches the full-T
+  result on every task — the precision dial is real, not just a training artifact.
+
 ## v0.1.2: closed-form encoder
 
 The first-order delta-sigma recurrence has a closed form — the cumulative
