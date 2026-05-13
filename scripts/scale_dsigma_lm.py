@@ -17,7 +17,7 @@ import torch.nn.functional as F
 
 from src.bpe import BPETokenizer
 from src.char_lm import BitCharLM, FPCharLM
-from src.dsigma_transformer import DSigmaCharLM
+from delta_sigma_nn.dsigma_transformer import DSigmaCharLM
 from src.physics_corpus import build_corpus
 
 

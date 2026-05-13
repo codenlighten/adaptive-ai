@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from src.multfree import count_ops, matmul_split_masks
-from src.trit_pack import (
+from delta_sigma_nn.trit_pack import (
     compression_ratio_vs_fp32,
     compression_ratio_vs_int8,
     pack_trits,

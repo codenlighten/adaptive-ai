@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.char_lm import BitCharLM, FPCharLM
-from src.dsigma_transformer import DSigmaCharLM
+from delta_sigma_nn.dsigma_transformer import DSigmaCharLM
 from src.physics_corpus import CharVocab, build_corpus, make_batches
 
 

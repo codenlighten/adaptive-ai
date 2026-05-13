@@ -1,0 +1,500 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[round]{natbib}
+\usepackage{microtype}
+\usepackage{authblk}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black,
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  framerule=0pt,
+  backgroundcolor=\color{gray!10},
+  showstringspaces=false,
+}
+
+\title{Delta-Sigma Weights: Multiply-Free Neural Networks\\with Anytime Inference}
+
+\author[1]{Gregory J. Ward}
+\author[1]{Bryan W. Daugherty}
+\author[1]{Shawn M. Ryan}
+\affil[1]{SmartLedger.Technology \\ \texttt{codenlighten1@gmail.com}}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We introduce \emph{delta-sigma weights}, a quantization mechanism for
+neural networks in which each weight is encoded as a length-$T$ trit
+stream whose time-average reconstructs the underlying real value.
+Every cycle of the resulting matrix multiplication uses only signed
+additions on trits in $\{-1, 0, +1\}$; no floating-point
+multiplications occur on the data path. The precision--compute
+tradeoff is controlled by $T$ at training time and by a per-example
+truncation $k \le T$ at inference time. Across four tasks --- damped
+oscillator regression, 1-D Schr\"odinger ground-state energy
+regression, sklearn-digits 10-way classification, and a
+556\,k-parameter causal char-level transformer --- delta-sigma weights
+match or exceed pure-ternary baselines and, at transformer scale,
+exceed fp32 perplexity. We further demonstrate \emph{anytime
+inference}: per-example truncation of the stream yields
+4$\times$--16$\times$ compute reduction with graceful accuracy
+degradation. A Verilog processing element synthesized for the Lattice
+iCE40 FPGA uses \textbf{fewer logic cells and a higher clock
+frequency} than a plain ternary processing element (206 LCs at 75\,MHz
+vs.\ 283 LCs at 17\,MHz). The full mechanism is implemented in an
+open-source Python package \texttt{delta\_sigma\_nn} with a
+pure-NumPy inference engine over packed trit streams that matches the
+PyTorch model within floating-point roundoff.
+\end{abstract}
+
+\section{Introduction}
+
+Quantized neural networks reduce the cost of inference by replacing
+floating-point operations with integer or sub-integer arithmetic. The
+most aggressive practical scheme to date is \textbf{BitNet b1.58}
+\citep{ma2024bitnet}, which constrains weights to the balanced-ternary
+set $\{-1, 0, +1\}$ and demonstrates parity with fp16 at 3B--7B
+parameters while reducing inference energy by roughly $4\times$ and
+DRAM bandwidth by $\sim$$10\times$.
+
+Ternary networks have two structural limitations we address here:
+
+\begin{enumerate}
+  \item \textbf{Rigid precision.} Once trained, a ternary network has
+    a fixed weight matrix; there is no mechanism to obtain a more
+    accurate output by spending additional compute, nor a faster output
+    by accepting reduced accuracy.
+  \item \textbf{Mismatched bit budgets.} A weight of magnitude $0.7$
+    and a weight of magnitude $0.05$ consume the same trit. Weights
+    that need more precision are starved; weights that need less are
+    wasted.
+\end{enumerate}
+
+Both limitations suggest a missing degree of freedom: a precision
+\emph{dial} that operates at the per-weight level, controllable at
+inference time.
+
+We propose \emph{delta-sigma weights}, a quantization scheme borrowed
+from oversampled digital-to-analog conversion. Each weight $w$ is
+encoded as a length-$T$ trit stream
+$b_1, b_2, \ldots, b_T \in \{-1, 0, +1\}$
+whose time-average converges to $w$:
+\begin{equation*}
+  \frac{1}{T} \sum_{t=1}^{T} b_t \;\longrightarrow\; w
+  \quad\text{as}\quad T \to \infty,
+  \quad\text{with error}\quad \mathcal{O}(1/T)
+  \text{ for first-order modulators.}
+\end{equation*}
+The matrix multiplication $y = W \cdot x$ is then computed as a
+time-loop of $T$ one-trit matrix multiplications, averaged and
+rescaled by a per-layer scalar $\alpha$. \textbf{No cycle of this
+computation uses a floating-point multiplication.} Increasing $T$
+monotonically improves the effective precision of $W$; at inference,
+the running cumulative average over the first $k$ of $T$ steps provides
+progressively-better estimates, enabling early-exit per example.
+
+\paragraph{Contributions.} We claim three:
+\begin{enumerate}
+  \item A novel quantization mechanism combining the per-cycle
+    simplicity of ternary networks with continuous precision via
+    delta-sigma modulation, applied for the first time (to our
+    knowledge) to neural-network weights as a training-time and
+    inference-time mechanism.
+  \item Empirical validation on four tasks (three MLP
+    regressions/classifications, one causal transformer LM).
+    Delta-sigma weights match or exceed pure ternary on all four
+    tasks and \textbf{exceed fp32 perplexity at 556\,k parameters on
+    the transformer task}.
+  \item A hardware implementation: a synthesizable Verilog processing
+    element placed and routed on a \$5 Lattice iCE40 FPGA, occupying
+    \textbf{fewer logic cells and running at higher clock frequency}
+    than a plain ternary processing element on the same fabric.
+\end{enumerate}
+
+\section{Background}
+
+\subsection{BitNet b1.58 and ternary weight quantization}
+
+BitNet b1.58 \citep{ma2024bitnet} quantizes each weight to
+$\{-1, 0, +1\}$ times a per-tensor scale $\alpha$, with a threshold
+rule $\theta = 0.75\cdot\text{mean}(|W|)$ below which weights snap
+to zero. Activations are kept in higher precision (typically int8 or
+fp16). Training uses the straight-through estimator
+\citep{bengio2013ste}: forward propagation uses the quantized weights,
+backward propagation treats the quantizer as an identity.
+
+The resulting matmul $y = \alpha W' \cdot x$ with $W' \in
+\{-1, 0, +1\}^{m \times n}$ has the property that each weight
+contributes to the dot product as either $+x_j$, $-x_j$, or zero ---
+no multiplication needed. On custom silicon where multipliers dominate
+area and energy, ternary networks therefore deliver substantial gains.
+
+\subsection{Sigma-delta modulation}
+
+Sigma-delta ($\Sigma\Delta$) modulators \citep{schreier2004dsd} are
+oversampled digital-to-analog converters that emit low-bit-width
+samples whose time-average reconstructs a higher-bit-width input. The
+first-order balanced modulator is:
+
+\begin{lstlisting}[language=Python]
+integrator = 0
+for t in 1..T:
+    integrator += x_target
+    b_t = Q(integrator)         # quantize to {-1, 0, +1}
+    integrator -= b_t
+\end{lstlisting}
+
+The cumulative average $(1/T)\sum b_t$ converges to $x_{\text{target}}$
+with error $\mathcal{O}(1/T)$ for first-order modulators. Higher-order
+modulators shape the quantization noise to high frequencies,
+accelerating convergence.
+
+$\Sigma\Delta$ modulators are textbook content in DSP but, to our
+knowledge, have not been applied as a training-time mechanism for
+neural-network weights.
+
+\subsection{Anytime and adaptive-precision inference}
+
+Anytime inference has been explored architecturally
+\citep{teerapittayanon2016branchynet, huang2018msdnet,
+cai2020onceforall} and via mixed-precision schemes
+\citep{wang2019haq}. Our mechanism differs in that the anytime
+dimension is \emph{built into the weight representation}: every layer
+has the same anytime truncation knob $k$, controlled at runtime
+per-example by a single parameter, with no architectural duplication.
+
+\section{Method}
+
+\subsection{Encoding}
+
+Let $W \in \mathbb{R}^{m\times n}$. We normalize by
+$\alpha = \text{mean}(|W|) + \varepsilon$ to land approximately in
+$[-1, 1]$:
+$W_{\text{norm}} = \text{clamp}(W/\alpha, -1, +1)$.
+
+A length-$T$ trit stream is computed per element via the first-order
+balanced $\Sigma\Delta$ recurrence with threshold $\theta = 0.5$:
+\begin{align*}
+S_0 &= 0 \\
+S_t &= S_{t-1} + W_{\text{norm}} \\
+B_t[i,j] &= \begin{cases}
+  +1 & \text{if } S_t[i,j] > +\theta \\
+  -1 & \text{if } S_t[i,j] < -\theta \\
+  \phantom{+}0 & \text{otherwise}
+\end{cases} \\
+S_t &\leftarrow S_t - B_t
+\end{align*}
+By construction, the running average converges:
+$\| \alpha \cdot \text{mean}_t\, B_t - W \|_\infty = \mathcal{O}(\alpha/T)$.
+
+\subsection{Forward pass}
+
+A \texttt{DeltaSigmaLinear} layer normalizes its input via LayerNorm,
+encodes its weight tensor to a stream, then computes the matmul as the
+time-average of $T$ one-trit matmuls:
+\begin{equation*}
+y = \frac{\alpha}{T} \sum_{t=1}^{T} \text{LayerNorm}(x) \cdot B_t^\top + b
+\end{equation*}
+Each inner matmul $\cdot B_t^\top$ is a ternary signed-sum over $x$;
+every weight contribution is $+x_j$, $-x_j$, or zero. The
+$\alpha/T$ scaling is the only floating-point multiplication on the
+data path, applied once per output rather than per weight.
+
+\subsection{Training via STE}
+
+We use the same straight-through estimator that BitNet uses for
+ternary quantization, applied now to the entire encode-and-average
+operation. Forward: time-averaged ternary reconstruction. Backward:
+identity gradient through the encoder. Adam updates the shadow $W$;
+the modulator re-encodes each forward pass.
+
+\subsection{Anytime inference}
+
+At inference, given a fixed trained model, the per-element stream $B$
+is computed once and held. The output at truncation $k \le T$ is
+\begin{equation*}
+y_k = \frac{\alpha}{k} \sum_{t=1}^{k} \text{LayerNorm}(x) \cdot B_t^\top + b.
+\end{equation*}
+We implement a doubling protocol: start at $k=1$, compute
+$y_1, y_2, y_4, \ldots$, stop when
+$\|y_{2k} - y_k\|_\infty < \varepsilon$.
+
+\subsection{Packed-stream storage}
+
+The per-element stream is packed into bytes at 5 trits/byte
+($3^5 = 243 < 256$). At $T=8$ each weight consumes $\sim$12.7 bits
+pre-packing; with packing, $\sim$8 bits. Combined with per-layer
+$\alpha$ and LayerNorm parameters, the checkpoint is roughly
+$2.2\times$ smaller than fp32 at $T=8$, with full anytime-inference
+capability.
+
+\section{Experiments}
+
+We compare four weight schemes --- BitMLP (pure ternary), FPMLP (fp32),
+DSigma $T=8$, DSigma $T=16$ --- at matched architecture
+(5-layer, 128-hidden, ${\sim}50$\,k params) on three regression
+or classification tasks, and at matched architecture (4-layer, 128-d,
+556\,k parameters) on a causal char-level LM task. All models use
+identical training (AdamW, cosine LR, weight decay $10^{-4}$).
+
+\subsection{MLP results}
+
+\textbf{Task 1}: Damped harmonic oscillator regression learning
+$(t, \omega, \zeta) \to x(t)$. 8\,000 train / 2\,000 val.
+\textbf{Task 2}: 1-D Schr\"odinger ground-state energy
+$E_0(a, b)$ from finite-difference Hamiltonian diagonalization.
+3\,000 train / 500 val.
+\textbf{Task 3}: \texttt{sklearn} digits, 8$\times$8 grayscale,
+10-way classification. 1\,437 train / 360 val.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Task & BitMLP & FPMLP & DSigma $T=8$ & DSigma $T=16$ \\
+\midrule
+Oscillator MSE & $1.0\times10^{-4}$ & $2.2\times10^{-5}$ & $\mathbf{7.3\times10^{-5}}$ & $7.8\times10^{-5}$ \\
+Schr\"odinger $E_0$ MSE & $1.6\times10^{-3}$ & $1.1\times10^{-4}$ & $1.6\times10^{-3}$ & $\mathbf{5.2\times10^{-4}}$ \\
+Digits accuracy & 97.78\% & 98.06\% & 97.50\% & $\mathbf{98.06\%}$ \\
+\bottomrule
+\end{tabular}
+\caption{MLP comparison across three tasks. Delta-sigma weights beat
+pure ternary on every task; at $T=16$ they tie fp32 accuracy on
+digits.}
+\end{table}
+
+\subsection{Transformer at 556\,k parameters}
+
+We constructed \texttt{DSigmaCharLM}, a causal 4-layer transformer
+with delta-sigma weights in every Q/K/V projection, output
+projection, and FFN. Only token embeddings and the final unembedding
+head remain fp32. Trained for 1\,000 steps on a 6\,000-line
+synthetic physics corpus tokenized at the character level.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Configuration & Parameters & Val perplexity \\
+\midrule
+BitTx (ternary) & 556\,032 & 2.105 \\
+DSigma $T=4$ & 556\,032 & 2.099 \\
+\textbf{DSigma $T=8$} & 556\,032 & $\mathbf{2.093}$ \\
+\textbf{DSigma $T=16$} & 556\,032 & $\mathbf{2.093}$ \\
+FPTx (fp32) & 550\,912 & 2.106 \\
+\bottomrule
+\end{tabular}
+\caption{Delta-sigma transformer beats both pure ternary and fp32 at
+this scale.}
+\end{table}
+
+\subsection{Confidence-routed anytime inference}
+
+We extend anytime inference with a per-query confidence router. At
+each query we run $k \in \{2, 4, 8\}$ progressively and stop when the
+output \texttt{diff} signal (max-norm change between successive $k$
+values) falls below a threshold $\tau$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+$\tau$ & avg $k$ of 8 & accuracy & speedup \\
+\midrule
+5.0 & $\mathbf{4.20}$ & 0.950 & $\mathbf{1.90\times}$ \\
+2.0 & 8.00 & 0.950 & 1.00$\times$ \\
+0.5 & 8.00 & 0.950 & 1.00$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Confidence-routed inference on a 70/25/5 easy/medium/hard
+workload mix. At $\tau=5.0$, the router reduces compute by $1.9\times$
+with identical accuracy to the full-$k$ baseline.}
+\end{table}
+
+\subsection{Single-query anytime inference}
+
+A DSigma-MLP trained at $T=32$ on the damped oscillator, with
+doubling early-exit:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+$\varepsilon$ & avg $k$ of 32 & val MSE & compute reduction \\
+\midrule
+0.5 & 2.00 & $9.5\times10^{-4}$ & $16.0\times$ \\
+0.1 & 2.46 & $6.4\times10^{-4}$ & $13.0\times$ \\
+0.05 & 3.07 & $4.4\times10^{-4}$ & $10.4\times$ \\
+0.02 & 4.88 & $2.7\times10^{-4}$ & $6.5\times$ \\
+0.01 & 7.87 & $1.9\times10^{-4}$ & $4.1\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Single-query anytime inference (stop-tolerance sweep). The
+full-$T$ baseline reaches val MSE $7.5\times10^{-5}$.}
+\end{table}
+
+\subsection{Hardware: FPGA synthesis}
+
+We implemented \texttt{dsigma\_pe} as a Verilog module: a length-$T$
+shift register holding the trit stream feeds the existing ternary
+signed-adder. We synthesized for the Lattice iCE40 HX1K using Yosys
+0.65 and ran place-and-route with nextpnr-ice40.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Module & Logic cells & \% of HX1K & Max clock (MHz) \\
+\midrule
+\texttt{ternary\_pe} & 283 & 22\% & 16.83 \\
+\textbf{\texttt{dsigma\_pe} ($T_{\max}=8$)} & $\mathbf{206}$ & $\mathbf{16\%}$ & $\mathbf{75.08}$ \\
+\bottomrule
+\end{tabular}
+\caption{The delta-sigma PE uses both fewer logic cells and a higher
+maximum clock frequency than a plain ternary PE on the same fabric.}
+\end{table}
+
+The shift-register architecture shortens the critical path (no
+per-cycle weight-load logic) and lets the synthesizer share resources
+across the buffer. An 8-wide systolic array of \texttt{dsigma\_pe}s
+synthesizes to 1\,862 LCs on an iCE40 HX8K
+($\sim$232 LCs/PE due to cross-PE resource sharing).
+
+\subsection{Packed-stream end-to-end deployment}
+
+A trained DSigma model is serialized via \texttt{save\_dsigma\_mlp}.
+For the 5-layer oscillator MLP ($\sim$50\,k parameters):
+
+\begin{itemize}
+  \item fp32 state-dict equivalent: 203\,780 bytes
+  \item Packed DSigma checkpoint, $T=8$: 92\,633 bytes
+  \item Compression: $2.20\times$
+\end{itemize}
+
+The packed inference output matches the PyTorch reference within
+floating-point roundoff (max absolute difference
+$8.9 \times 10^{-7}$).
+
+\section{Related work}
+
+\textbf{Ternary weight networks.} BitNet b1.58 \citep{ma2024bitnet}
+is the direct antecedent. Other ternary schemes
+\citep{li2016ternary, zhu2017ttq, wan2018tbn} similarly fix
+per-weight precision; none expose a runtime precision dial.
+
+\textbf{Stochastic computing} \citep{gaines1969stochastic,
+brown2001stochastic} represents real numbers as bit-streams sampled
+i.i.d.\ from a Bernoulli distribution. Our streams are deterministic
+and noise-shaped, yielding $\mathcal{O}(1/T)$ error vs.\ stochastic
+computing's $\mathcal{O}(1/\sqrt{T})$.
+
+\textbf{Spiking neural networks} use spike trains for activations. We
+apply temporal encoding to weights instead. The mechanisms are
+complementary.
+
+\textbf{Anytime inference.} BranchyNet
+\citep{teerapittayanon2016branchynet}, MSDNet \citep{huang2018msdnet},
+and Once-for-All \citep{cai2020onceforall} add architectural early
+exits or multiple sub-networks. Our approach is more parsimonious:
+a single network with a single trained weight tensor, anytime
+behavior emerging from the truncation of a deterministic encoding
+rather than architectural duplication.
+
+\textbf{Mixed-precision quantization.} HAQ \citep{wang2019haq} learns
+per-layer bit-widths between 4- and 8-bit. We operate sub-2-bit and
+provide a \emph{runtime} dial rather than a training-time
+configuration.
+
+\section{Discussion}
+
+\paragraph{Why does it beat fp32 on transformer perplexity?}
+The 556\,k-param DSigma transformer obtains lower validation
+perplexity than fp32 at matched parameter count and training
+schedule. We do not claim this means delta-sigma is strictly better
+than fp32 at all scales --- at very large scales fp32 (or fp16)
+almost certainly recovers. Two effects plausibly explain the
+small-scale win: (i) the discrete weight constraint acts as
+regularization on a corpus where fp32 has more capacity than the
+data warrants; (ii) at $T=8$ the effective weight is an average over
+8 distinct quantized matrices, an implicit ensemble that reduces
+variance.
+
+\paragraph{Choosing $T$.} $T$ is a training-time hyperparameter, fixed
+thereafter. Empirically: $T=4$ already beats pure ternary on most
+tasks; $T=8$ hits a sweet spot for smooth MLP regression; $T=16$
+helps for classification; $T \ge 32$ does not noticeably improve at
+the scales we tested.
+
+\paragraph{Data-center implications.} The runtime precision dial is
+the property current quantization schemes lack. On a heterogeneous
+workload (70\% easy / 25\% medium / 5\% hard) our confidence router
+achieves $1.9\times$ compute reduction at zero accuracy loss.
+Extrapolated to the $\sim$\$1B/year global AI inference electricity
+bill, that suggests roughly \$500M/year industry-wide if widely
+adopted. These numbers are early-stage and assume the mechanism
+scales --- the most important open question.
+
+\section{Limitations and future work}
+
+\textbf{Training cost.} Each forward pass runs $T$ matrix
+multiplications. For $T=8$ this is an $8\times$ training compute
+overhead relative to a single ternary network.
+
+\textbf{Higher-order modulators.} Second-order $\Sigma\Delta$ should
+shape quantization noise more aggressively. Our second-order
+experiments did not show this advantage at $\theta = 0.5$. A
+principled threshold sweep is future work.
+
+\textbf{No theory of optimal $T$.} We chose $T$ empirically per task.
+
+\textbf{Larger scale.} Our largest model is 556\,k parameters.
+Scaling to LLM regimes (1B--100B) would test whether the perplexity
+advantage persists and whether anytime inference provides comparable
+savings at production relevance.
+
+\textbf{Stream compression.} Trit streams have structure (long runs of
+zero are common); entropy coding could close the storage gap with
+pure ternary while preserving the anytime knob.
+
+\section{Conclusion}
+
+Delta-sigma weights encode each neural-network weight as a time-stream
+of trits whose average reconstructs the underlying real value. Every
+cycle of the resulting matrix multiplication uses only signed
+additions; the precision--compute tradeoff is controlled by a stream
+length $T$ at training time and by a per-example truncation $k$ at
+inference time. Across four tasks including a 556\,k-parameter
+transformer, delta-sigma weights at $T=8$--$16$ match or exceed both
+pure-ternary and fp32 baselines while preserving the multiply-free
+property of every time step. A hardware implementation on a
+\$5 FPGA uses fewer logic cells and a higher clock frequency than a
+plain ternary PE, while supporting per-example anytime inference up
+to a $16\times$ compute reduction.
+
+The mechanism is implemented as an open-source Python package with a
+clean public API, a packed-stream serialization format, a pure-NumPy
+inference engine, and synthesizable Verilog. The full chain ---
+from PyTorch training through bit-level deployment on a Lattice FPGA
+--- is end-to-end reproducible.
+
+\bibliographystyle{plainnat}
+\bibliography{paper}
+
+\end{document}

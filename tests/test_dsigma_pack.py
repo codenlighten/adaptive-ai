@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from src.dsigma_linear import DeltaSigmaMLP
-from src.dsigma_pack import dsigma_inference, load_dsigma_arrays, save_dsigma_mlp
+from delta_sigma_nn.dsigma_linear import DeltaSigmaMLP
+from delta_sigma_nn.dsigma_pack import dsigma_inference, load_dsigma_arrays, save_dsigma_mlp
 
 
 def test_dsigma_pack_roundtrip():

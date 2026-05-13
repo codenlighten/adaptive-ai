@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.trit_pack import (
+from delta_sigma_nn.trit_pack import (
     compression_ratio_vs_fp32,
     pack_trits,
     storage_bytes,

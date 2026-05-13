@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 
-from src.dsigma_linear import DeltaSigmaMLP
+from delta_sigma_nn.dsigma_linear import DeltaSigmaMLP
 from src.model import BitMLP, FPMLP
 from src.schrodinger import make_dataset as schrodinger_dataset
 from src.schrodinger import normalize as schrodinger_normalize

@@ -1,6 +1,6 @@
 import torch
 
-from src.dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
+from delta_sigma_nn.dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
 
 
 def test_dsigma_linear_forward():

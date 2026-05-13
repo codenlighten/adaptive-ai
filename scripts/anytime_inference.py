@@ -26,7 +26,7 @@ import torch
 import torch.nn as nn
 
 from src.data import make_dataset, normalize
-from src.dsigma_linear import DeltaSigmaMLP
+from delta_sigma_nn.dsigma_linear import DeltaSigmaMLP
 
 
 def train(model, X, y, X_val, y_val, epochs=150, lr=2e-3, batch_size=256):

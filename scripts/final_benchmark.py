@@ -26,8 +26,8 @@ from sklearn.model_selection import train_test_split
 
 from src.data import make_dataset as oscillator_dataset
 from src.data import normalize as oscillator_normalize
-from src.dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
-from src.dsigma_pack import save_dsigma_mlp
+from delta_sigma_nn.dsigma_linear import DeltaSigmaLinear, DeltaSigmaMLP
+from delta_sigma_nn.dsigma_pack import save_dsigma_mlp
 from src.model import BitMLP, FPMLP
 from src.schrodinger import make_dataset as schrodinger_dataset
 from src.schrodinger import normalize as schrodinger_normalize

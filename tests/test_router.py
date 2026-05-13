@@ -1,7 +1,7 @@
 import torch
 
-from src.dsigma_router import confidence_router
-from src.dsigma_transformer import DSigmaCharLM
+from delta_sigma_nn.dsigma_router import confidence_router
+from delta_sigma_nn.dsigma_transformer import DSigmaCharLM
 
 
 def test_router_returns_logits():

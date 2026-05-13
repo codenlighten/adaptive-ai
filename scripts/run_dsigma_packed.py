@@ -14,8 +14,8 @@ import torch
 import torch.nn as nn
 
 from src.data import make_dataset, normalize
-from src.dsigma_linear import DeltaSigmaMLP
-from src.dsigma_pack import dsigma_inference, load_dsigma_arrays, save_dsigma_mlp
+from delta_sigma_nn.dsigma_linear import DeltaSigmaMLP
+from delta_sigma_nn.dsigma_pack import dsigma_inference, load_dsigma_arrays, save_dsigma_mlp
 
 
 def train_quick(model, X, y, X_val, y_val, epochs=150, lr=2e-3, batch_size=256):

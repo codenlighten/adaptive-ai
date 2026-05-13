@@ -1,6 +1,6 @@
 import torch
 
-from src.delta_sigma import (
+from delta_sigma_nn.delta_sigma import (
     decode_delta_sigma,
     encode_delta_sigma_binary,
     encode_delta_sigma_order2,

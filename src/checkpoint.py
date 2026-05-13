@@ -27,7 +27,7 @@ import torch
 
 from .model import BitMLP
 from .ternary import BitLinear, ternarize
-from .trit_pack import pack_trits, unpack_trits, storage_bytes
+from delta_sigma_nn.trit_pack import pack_trits, unpack_trits, storage_bytes
 
 
 def save_bitmlp(model: BitMLP, path: str | Path,

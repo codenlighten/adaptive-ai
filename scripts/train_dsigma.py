@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 
 from src.data import make_dataset, normalize
-from src.dsigma_linear import DeltaSigmaMLP
+from delta_sigma_nn.dsigma_linear import DeltaSigmaMLP
 from src.model import BitMLP, FPMLP
 
 

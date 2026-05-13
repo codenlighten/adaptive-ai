@@ -24,8 +24,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from src.dsigma_router import confidence_router
-from src.dsigma_transformer import DSigmaCharLM
+from delta_sigma_nn.dsigma_router import confidence_router
+from delta_sigma_nn.dsigma_transformer import DSigmaCharLM
 from src.physics_corpus import CharVocab, build_corpus, make_batches
 
 
