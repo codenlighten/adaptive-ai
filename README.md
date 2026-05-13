@@ -213,6 +213,26 @@ To turn this from "validated mechanism" into "production technique":
    exposes the runtime precision knob to applications, with SLA controls
    and quality monitoring.
 
+## Citation
+
+If you build on this work, please cite:
+
+```bibtex
+@misc{ward2026deltasigma,
+  author = {Ward, Gregory J. and Daugherty, Bryan W. and Ryan, Shawn M.},
+  title  = {Delta-Sigma Weights: Multiply-Free Neural Networks with Anytime Inference},
+  year   = {2026},
+  url    = {https://github.com/codenlighten/adaptive-ai},
+  note   = {SmartLedger.Technology}
+}
+```
+
+## Authors
+
+- **Gregory J. Ward** — CTO, [SmartLedger.Technology](https://smartledger.technology) — codenlighten1@gmail.com (corresponding)
+- **Bryan W. Daugherty** — SmartLedger.Technology
+- **Shawn M. Ryan** — SmartLedger.Technology
+
 ## License
 
-MIT.
+MIT — see [LICENSE](LICENSE).

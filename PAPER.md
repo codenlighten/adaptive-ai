@@ -1,6 +1,8 @@
 # Delta-Sigma Weights: Multiply-Free Neural Networks with Anytime Inference
 
-**Anonymous Authors**
+**Gregory J. Ward**, **Bryan W. Daugherty**, **Shawn M. Ryan**
+*SmartLedger.Technology*
+Corresponding author: `codenlighten1@gmail.com`
 
 ## Abstract
 

@@ -9,7 +9,11 @@ description = "Multiply-free neural networks with delta-sigma weights and anytim
 readme = "DELTA_SIGMA_WEIGHTS.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "physics-ai"}]
+authors = [
+    {name = "Gregory J. Ward", email = "codenlighten1@gmail.com"},
+    {name = "Bryan W. Daugherty"},
+    {name = "Shawn M. Ryan"},
+]
 keywords = ["quantization", "neural-networks", "ternary", "bitnet", "delta-sigma", "anytime-inference"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -31,8 +35,9 @@ plot = ["matplotlib>=3.6"]
 dev = ["pytest>=7.0"]
 
 [project.urls]
-Documentation = "https://github.com/example/delta-sigma-nn/blob/main/DELTA_SIGMA_WEIGHTS.md"
-Source = "https://github.com/example/delta-sigma-nn"
+Documentation = "https://github.com/codenlighten/adaptive-ai/blob/main/DELTA_SIGMA_WEIGHTS.md"
+Source = "https://github.com/codenlighten/adaptive-ai"
+Issues = "https://github.com/codenlighten/adaptive-ai/issues"
 
 [tool.setuptools]
 packages = ["delta_sigma_nn"]
